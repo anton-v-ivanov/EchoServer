@@ -31,7 +31,6 @@ namespace EchoServer.Rooms
 			var room = _rooms.GetOrAdd(message.RoomId, _ => new Lazy<Room>(() =>
 			{
 				var r = new Room(message.RoomId);
-				r.AddConnection(message.ClientId, socket);
 				FireRoomCreated(message.RoomId);
 				return r;
 			}, LazyThreadSafetyMode.ExecutionAndPublication));
