@@ -8,3 +8,5 @@ After successfull connection the client starts to send message every 100ms.
 Echo-messages are sent to all the clients in the room.
 
 If the room in not receiving messages for 1 minutes, this room will be destroyed.
+
+Server and client use TCP protocol and raw sockets.
