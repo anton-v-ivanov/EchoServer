@@ -28,6 +28,7 @@ namespace EchoServer.Rooms
 
 		public void Add(Message message, Socket socket)
 		{
+			// ConcurrentDictionary is not guaranteed to invoke add method once, so we use lazy behavior
 			var room = _rooms.GetOrAdd(message.RoomId, _ => new Lazy<Room>(() =>
 			{
 				var r = new Room(message.RoomId);
@@ -43,7 +44,7 @@ namespace EchoServer.Rooms
 			var removed = 0;
 			foreach (var roomInfo in _rooms)
 			{
-				Socket s;
+				Lazy<Socket> s;
 				if (roomInfo.Value.Value.Connections.TryRemove(clientId, out s))
 					removed++;
 			}
@@ -73,7 +74,7 @@ namespace EchoServer.Rooms
 				var completed = false;
 				try
 				{
-					completed = socket.SendAsync(arg);
+					completed = socket.Value.SendAsync(arg);
 				}
 				catch (SocketException)
 				{
@@ -115,7 +116,7 @@ namespace EchoServer.Rooms
 			{
 				try
 				{
-					socket.Close();
+					socket.Value.Close();
 				}
 				catch
 				{
