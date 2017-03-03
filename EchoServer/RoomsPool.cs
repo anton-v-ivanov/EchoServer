@@ -102,24 +102,22 @@ namespace EchoServer
 			foreach (var roomConnection in room.Connections)
 			{
 				var socket = roomConnection.Value;
-				{
-					var buffer = Encoding.UTF8.GetBytes(message.ToString());
-					var arg = new SocketAsyncEventArgs();
-					arg.SetBuffer(buffer, 0, buffer.Length);
-					arg.Completed += SendCallback;
+				var buffer = Encoding.UTF8.GetBytes(message.ToString());
+				var arg = new SocketAsyncEventArgs();
+				arg.SetBuffer(buffer, 0, buffer.Length);
+				arg.Completed += SendCallback;
 
-					var completed = false;
-					try
-					{
-						completed = socket.SendAsync(arg);
-					}
-					catch (SocketException)
-					{
-					}
-					if (!completed)
-					{
-						SendCallback(EventArgs.Empty, arg);
-					}
+				var completed = false;
+				try
+				{
+					completed = socket.SendAsync(arg);
+				}
+				catch (SocketException)
+				{
+				}
+				if (!completed)
+				{
+					SendCallback(EventArgs.Empty, arg);
 				}
 			}
 		}

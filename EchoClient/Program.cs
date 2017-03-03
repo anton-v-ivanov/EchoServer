@@ -17,8 +17,9 @@ namespace EchoClient
 		private static ushort _port;
 		private static string _serverName;
 		private static Timer _timer;
-		private static Socket socket;
-		private static IPEndPoint endpoint;
+		private static Socket _socket;
+		private static IPEndPoint _endpoint;
+		private static bool isReconnecting;
 
 		static void Main(string[] args)
 		{
@@ -60,9 +61,6 @@ namespace EchoClient
 					Connect(_roomId, _clientId);
 				}
 			}, null, 0, 100);
-
-			var connection = new SocketConnectionInfo { Socket = socket };
-			socket.BeginReceive(connection.Buffer, 0, connection.Buffer.Length, SocketFlags.None, DataReceived, connection);
 
 			Console.WriteLine("Press any key to exit");
 			Console.Read();
@@ -137,13 +135,9 @@ namespace EchoClient
 
 		private static void Connect(string roomId, string clientId)
 		{
-			while (true)
+			if (_socket == null || !_socket.Connected)
 			{
-				if (socket != null && socket.Connected)
-					break;
-
-				if (SetupSocket())
-					break;
+				SetupSocket();
 			}
 
 			// Sending connect message
@@ -161,7 +155,7 @@ namespace EchoClient
 			bool completed;
 			try
 			{
-				completed = socket.SendAsync(arg);
+				completed = _socket.SendAsync(arg);
 			}
 			catch (SocketException)
 			{
@@ -180,31 +174,41 @@ namespace EchoClient
 		{
 		}
 
-		private static bool SetupSocket()
+		private static void SetupSocket()
 		{
+			if (isReconnecting)
+				return;
+
+			isReconnecting = true;
 			var hostInfo = Dns.GetHostEntry(_serverName);
 			var serverAddr = hostInfo.AddressList.FirstOrDefault(t => t.AddressFamily == AddressFamily.InterNetwork);
 			if (serverAddr == null)
 				throw new Exception("No IPv4 address for server");
 
-			endpoint = new IPEndPoint(serverAddr, _port);
-			socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-			return ConnectSocket();
+			_endpoint = new IPEndPoint(serverAddr, _port);
+			_socket = new Socket(_endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+			ConnectSocket();
+			isReconnecting = false;
 		}
 
-		private static bool ConnectSocket()
+		private static void ConnectSocket()
 		{
-			try
+			while (true)
 			{
-				socket.Connect(endpoint);
+				try
+				{
+					_socket.Connect(_endpoint);
+
+					var connection = new SocketConnectionInfo { Socket = _socket };
+					_socket.BeginReceive(connection.Buffer, 0, connection.Buffer.Length, SocketFlags.None, DataReceived, connection);
+					break;
+				}
+				catch (Exception)
+				{
+					Console.WriteLine("Unable to connect");
+					Thread.Sleep(500);
+				}
 			}
-			catch (Exception)
-			{
-				Console.WriteLine("Unable to connect");
-				Thread.Sleep(500);
-				return false;
-			}
-			return true;
 		}
 	}
 }
