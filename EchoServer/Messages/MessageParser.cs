@@ -3,17 +3,17 @@ using System.Collections.Generic;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace EchoServer
+namespace EchoServer.Messages
 {
-	public class MessageParser
+	public class MessageParser : IMessageParser
 	{
-		public static IEnumerable<Message> Parse(byte[] buffer)
+		public IEnumerable<Message> Parse(byte[] buffer)
 		{
 			var bufferStr = Encoding.UTF8.GetString(buffer);
 			return Parse(bufferStr);
 		}
 
-		public static IEnumerable<Message> Parse(string message)
+		public IEnumerable<Message> Parse(string message)
 		{
 			var lines = message.Split(new[] {"\r\n", "\n"}, StringSplitOptions.RemoveEmptyEntries);
 			var result = new List<Message>();

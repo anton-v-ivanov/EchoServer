@@ -1,4 +1,5 @@
 ﻿using System;
+using EchoServer.Core;
 
 namespace EchoServer
 {
@@ -24,7 +25,7 @@ namespace EchoServer
 				}
 			}
 			
-			var server = new SocketServer();
+			IServer server = new SocketServer();
 			server.OnClientConnected += (roomId, clientId) => Console.WriteLine($"{DateTime.Now.ToLongTimeString()} Client connected. RoomId = {roomId}, ClientId = {clientId}");
 			server.OnClientDisconnected += c => Console.WriteLine($"{DateTime.Now.ToLongTimeString()} Client disconnected: {c}");
 			server.OnError += exc => Console.WriteLine($"{DateTime.Now.ToLongTimeString()} Error: {exc.Message}");

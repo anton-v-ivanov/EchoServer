@@ -1,14 +1,8 @@
 ﻿using System;
 using Newtonsoft.Json;
 
-namespace EchoServer
+namespace EchoServer.Messages
 {
-	public enum OperationType
-	{
-		Message = 0,
-		Connect = 1	
-	}
-
 	public class Message
 	{
 		public OperationType OperationType { get; }

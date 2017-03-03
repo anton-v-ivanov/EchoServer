@@ -2,14 +2,16 @@
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using EchoServer.Messages;
+using EchoServer.Rooms;
 
-namespace EchoServer
+namespace EchoServer.Core
 {
-	public sealed class SocketServer : IDisposable
+	public sealed class SocketServer : IDisposable, IServer
 	{
 		private const int MaxConnections = 100;
-
-		private readonly RoomsPool _rooms;
+		private readonly IMessageParser _messageParser;
+		private readonly IRoomsPool _rooms;
 		private Socket _serverSocket;
 
 		#region Events
@@ -23,6 +25,8 @@ namespace EchoServer
 
 		public SocketServer()
 		{
+			_messageParser = new MessageParser();
+
 			_rooms = new RoomsPool();
 			_rooms.OnRoomCreated += FireRoomCreated;
 			_rooms.OnRoomDestroyed += FireRoomDestroyed;
@@ -42,6 +46,12 @@ namespace EchoServer
 			_serverSocket.Bind(endpoint);
 			_serverSocket.Listen(MaxConnections);
 			_serverSocket.BeginAccept(ClientConnected, _serverSocket);
+		}
+
+		public void Stop()
+		{
+			_rooms.Clear();
+			_serverSocket.Close();
 		}
 
 		private void ClientConnected(IAsyncResult ar)
@@ -81,10 +91,10 @@ namespace EchoServer
 						return;
 
 					// there is a chance that we have more than one packet in buffer
-					var messages = MessageParser.Parse(connection.Buffer);
+					var messages = _messageParser.Parse(connection.Buffer);
 					foreach (var message in messages)
 					{
-						Process(message, socket);
+						ProcessMessage(message, socket);
 					}
 					return;
 				}
@@ -95,10 +105,10 @@ namespace EchoServer
 					connection.Buffer.CopyTo(buffer, 0);
 
 					// there is a chance that we have more than one packet in buffer
-					var messages = MessageParser.Parse(buffer);
+					var messages = _messageParser.Parse(buffer).ToList();
 					foreach (var message in messages)
 					{
-						Process(message, socket);
+						ProcessMessage(message, socket);
 					}
 
 					if (connection.ClientId == null)
@@ -109,20 +119,16 @@ namespace EchoServer
 							connection.ClientId = msg.ClientId;
 					}
 
+					// clear buffer for next packet
 					Array.Clear(connection.Buffer, 0, connection.Buffer.Length);
 					connection.BytesRead = 0;
-
-					//connection = new SocketConnectionInfo
-					//{
-					//	Socket = ((SocketConnectionInfo)ar.AsyncState).Socket,
-					//	ClientId = ((SocketConnectionInfo)ar.AsyncState).ClientId,
-					//};
 
 					connection.Socket.BeginReceive(connection.Buffer, 0, connection.Buffer.Length, SocketFlags.None, DataReceived,
 						connection);
 				}
 				else
 				{
+					// resize array if we have a large amount of data to receive
 					Array.Resize(ref connection.Buffer, connection.Buffer.Length + SocketConnectionInfo.BufferSize);
 					connection.Socket.BeginReceive(connection.Buffer, 0, connection.Buffer.Length, SocketFlags.None, DataReceived,
 						connection);
@@ -130,8 +136,19 @@ namespace EchoServer
 			}
 			catch (SocketException)
 			{
+				// client disconnected
 				if(connection.ClientId != null)
 					_rooms.Remove(connection.ClientId);
+				
+				// client disconnected but we might have some data in buffer to read
+				if (connection.BytesRead > 0)
+				{
+					var messages = _messageParser.Parse(connection.Buffer);
+					foreach (var message in messages)
+					{
+						ProcessMessage(message, socket);
+					}
+				}
 			}
 			catch (ObjectDisposedException)
 			{
@@ -145,16 +162,26 @@ namespace EchoServer
 			{
 				if (IsSocketConnected(socket))
 					socket.BeginReceive(connection.Buffer, 0, connection.Buffer.Length, SocketFlags.None, DataReceived, connection);
+			}
+		}
 
-				// client disconnected but we have some data in buffer to read
-				if (connection.BytesRead > 0)
-				{
-					var messages = MessageParser.Parse(connection.Buffer);
-					foreach (var message in messages)
-					{
-						Process(message, socket);
-					}
-				}
+		private void ProcessMessage(Message message, Socket socket)
+		{
+			if (message == null)
+				return;
+
+			switch (message.OperationType)
+			{
+				case OperationType.Message:
+					FireMessageReceived(message.RoomId, message.ClientId, message.Text);
+					_rooms.SendMessage(message);
+					break;
+				case OperationType.Connect:
+					_rooms.Add(message, socket);
+					FireClientConnected(message.RoomId, message.ClientId);
+					break;
+				default:
+					throw new ArgumentOutOfRangeException();
 			}
 		}
 
@@ -170,37 +197,12 @@ namespace EchoServer
 			}
 		}
 
-		private void Process(Message message, Socket socket)
-		{
-			if (message == null)
-				return;
-
-			switch (message.OperationType)
-			{
-				case OperationType.Message:
-					FireMessageReceived(message.RoomId, message.ClientId, message.Text);
-					_rooms.SendMessage(message);
-					break;
-				case OperationType.Connect:
-					_rooms.Add(message.RoomId, message.ClientId, socket);
-					FireClientConnected(message.RoomId, message.ClientId);
-					break;
-				default:
-					throw new ArgumentOutOfRangeException();
-			}
-		}
-
 		public void Dispose()
 		{
 			Stop();
 		}
-
-		public void Stop()
-		{
-			_rooms.Dispose();
-			_serverSocket.Close();
-		}
-
+		
+		#region events invocators
 		private void FireClientConnected(string roomId, string clientId)
 		{
 			OnClientConnected?.Invoke(roomId, clientId);
@@ -230,5 +232,6 @@ namespace EchoServer
 		{
 			OnClientDisconnected?.Invoke(clientId);
 		}
+		#endregion
 	}
 }

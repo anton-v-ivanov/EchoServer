@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using EchoServer;
+using EchoServer.Messages;
 
 namespace EchoClient
 {
@@ -19,7 +20,8 @@ namespace EchoClient
 		private static Timer _timer;
 		private static Socket _socket;
 		private static IPEndPoint _endpoint;
-		private static bool isReconnecting;
+		private static bool _isReconnecting;
+		private static IMessageParser _messageParser;
 
 		static void Main(string[] args)
 		{
@@ -46,6 +48,9 @@ namespace EchoClient
 				Console.Read();
 				return;
 			}
+
+			_messageParser = new MessageParser();
+
 			var random = new Random();
 			_clientId = random.Next().ToString();
 
@@ -120,7 +125,7 @@ namespace EchoClient
 
 		private static void Process(byte[] buffer)
 		{
-			var messages = MessageParser.Parse(buffer);
+			var messages = _messageParser.Parse(buffer);
 			foreach (var message in messages)
 			{
 				if (message != null)
@@ -176,10 +181,10 @@ namespace EchoClient
 
 		private static void SetupSocket()
 		{
-			if (isReconnecting)
+			if (_isReconnecting)
 				return;
 
-			isReconnecting = true;
+			_isReconnecting = true;
 			var hostInfo = Dns.GetHostEntry(_serverName);
 			var serverAddr = hostInfo.AddressList.FirstOrDefault(t => t.AddressFamily == AddressFamily.InterNetwork);
 			if (serverAddr == null)
@@ -188,7 +193,7 @@ namespace EchoClient
 			_endpoint = new IPEndPoint(serverAddr, _port);
 			_socket = new Socket(_endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 			ConnectSocket();
-			isReconnecting = false;
+			_isReconnecting = false;
 		}
 
 		private static void ConnectSocket()

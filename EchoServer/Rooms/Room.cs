@@ -2,7 +2,7 @@
 using System.Collections.Concurrent;
 using System.Net.Sockets;
 
-namespace EchoServer
+namespace EchoServer.Rooms
 {
 	internal class Room
 	{
