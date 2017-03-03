@@ -2,8 +2,8 @@
 Echo server contains rooms.
 Each room has a string identifier.
 
-When connecting to a server, the client sends the Id of the room id of the client.
-If the room with this id doesn't exist on the server, it is created.
+When connecting to a server, the client sends ClientId and RoomId.
+If the room with this id doesn't exist on the server, it will be created.
 After successfull connection the client starts to send message every 100ms.
 Echo-messages are sent to all the clients in the room.
 
